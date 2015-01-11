@@ -44,6 +44,7 @@ class Infoblox(object):
 	create_dhcp_range
 	delete_dhcp_range
 	get_next_available_ip
+	get_next_available_ips
 	get_host
 	get_host_by_ip
 	get_ip_by_host
