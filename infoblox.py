@@ -112,6 +112,43 @@ class Infoblox(object):
 	    raise Exception(r)
 	except Exception:
 	    raise
+    def get_next_available_ips(self, network):
+	""" Implements IBA next_available_ip REST API call
+	Returns IP v4 address
+	:param network: network in CIDR format
+	"""
+	rest_url = 'https://' + self.iba_host + '/wapi/v' + self.iba_wapi_version + '/network?network=' + network + '&network_view=' + self.iba_network_view
+	try:
+	    r = requests.get(url=rest_url, auth=(self.iba_user, self.iba_password), verify=self.iba_verify_ssl)
+	    r_json = r.json()
+	    if r.status_code == 200:
+		if len(r_json) > 0:
+		    net_ref = r_json[0]['_ref']
+		    rest_url = 'https://' + self.iba_host + '/wapi/v' + self.iba_wapi_version + '/' + net_ref + '?_function=next_available_ip&num=10'
+		    r = requests.post(url=rest_url, auth=(self.iba_user, self.iba_password), verify=self.iba_verify_ssl)
+		    r_json = r.json()
+		    if r.status_code == 200:
+			ip_v4 = r_json['ips'][0:10]
+			return ip_v4
+		    else:
+			if 'text' in r_json:
+			    if 'code' in r_json and r_json['code'] == 'Client.Ibap.Data':
+				raise InfobloxNoIPavailableException(r_json['text'])
+			    else:
+				raise InfobloxGeneralException(r_json['text'])
+			else:
+			    r.raise_for_status()
+		else:
+		    raise InfobloxNotFoundException("No requested network found: " + network)
+	    else:
+		if 'text' in r_json:
+		    raise InfobloxGeneralException(r_json['text'])
+		else:
+		    r.raise_for_status()
+	except ValueError:
+	    raise Exception(r)
+	except Exception:
+	    raise
 
     def create_host_record(self, address, fqdn):
 	""" Implements IBA REST API call to create IBA host record
@@ -126,7 +163,7 @@ class Infoblox(object):
 		ipv4addr = address
 	    else:
 		raise InfobloxBadInputParameter('Expected IP or NET address in CIDR format')
-	rest_url = 'https://' + self.iba_host + '/wapi/v' + self.iba_wapi_version + '/record:host' + '?_return_fields=ipv4addrs'
+	rest_url = 'https://' + self.iba_host + '/wapi/v' + self.iba_wapi_version + '/record:host'
 	payload = '{"ipv4addrs": [{"configure_for_dhcp": false,"ipv4addr": "' + ipv4addr + '"}],"name": "' + fqdn + '","view": "' + self.iba_dns_view + '"}'
 	try:
 	    r = requests.post(url=rest_url, auth=(self.iba_user, self.iba_password), verify=self.iba_verify_ssl, data=payload)
